@@ -51,3 +51,5 @@ python -m src.mcp_server
 ## License
 
 MIT License
+
+@marlonsouza
