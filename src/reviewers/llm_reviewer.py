@@ -20,9 +20,14 @@ class LLMReviewer:
         
         for diff_item in diff_index:
             file_path = diff_item.a_path
-            diff = diff_item.diff.decode('utf-8')
-            with open(os.path.join(self.repo.working_dir, file_path), 'r') as f:
-                content = f.read()
+            # Handle the diff content properly based on its type
+            diff = diff_item.diff.decode('utf-8') if isinstance(diff_item.diff, bytes) else str(diff_item.diff)
+            
+            try:
+                with open(os.path.join(self.repo.working_dir, file_path), 'r') as f:
+                    content = f.read()
+            except (FileNotFoundError, IOError):
+                content = ""
                 
             changes.append({
                 'file_path': file_path,

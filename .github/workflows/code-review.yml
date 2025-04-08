@@ -7,6 +7,9 @@ on:
 jobs:
   code-review:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
     steps:
       - uses: actions/checkout@v3
         with:
@@ -22,6 +25,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Set up environment
+        run: |
+          echo "OPENAI_MODEL=gpt-3.5-turbo" >> $GITHUB_ENV
+
       - name: Run Code Review
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -30,16 +37,22 @@ jobs:
           python -m src.github_action | tee code_review_output.txt
 
       - name: Comment on PR
+        if: success()
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             const review = fs.readFileSync('code_review_output.txt', 'utf8');
-            const githubContext = github.context;
-            await github.rest.issues.createComment({
-              owner: githubContext.repo.owner,
-              repo: githubContext.repo.repo,
-              issue_number: githubContext.issue.number,
-              body: review
-            });
+            
+            if (review.trim()) {
+              const header = '## 🤖 AI Code Review\n\n';
+              const footer = '\n\n---\n*This review was automatically generated*';
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.name,
+                issue_number: context.issue.number,
+                body: header + review + footer
+              });
+            }

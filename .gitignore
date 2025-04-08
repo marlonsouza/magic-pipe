@@ -1,11 +1,34 @@
-.env
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-.venv/
-.idea/
-.vscode/
-*.log
-dist/
+*.so
+.Python
+env/
 build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
 *.egg-info/
+.installed.cfg
+*.egg
+.venv/
+
+# Environment variables
+.env
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Logs
+*.log
+code_review_output.txt

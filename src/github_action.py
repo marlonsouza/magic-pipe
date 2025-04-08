@@ -1,6 +1,6 @@
 import asyncio
 import os
-from reviewers.llm_reviewer import LLMReviewer
+from src.reviewers.llm_reviewer import LLMReviewer
 from git import Repo
 
 async def main():
