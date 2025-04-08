@@ -42,7 +42,7 @@ jobs:
       - name: Install AI Code Reviewer
         run: |
           python -m pip install --upgrade pip
-          pip install git+https://github.com/YOUR_USERNAME/pipemagic.git
+          pip install git+https://github.com/marlonsouza/pipemagic.git
 
       - name: Run Code Review
         env:
