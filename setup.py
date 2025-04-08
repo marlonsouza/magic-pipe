@@ -10,11 +10,11 @@ setup(
         "python-dotenv>=1.1.0"
     ],
     author="Marlon Souza",
-    author_email="your.email@example.com",
+    author_email="marlon.souuza@gmail.com",
     description="An AI-powered code review tool for GitHub Actions",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/YOUR_USERNAME/pipemagic",
+    url="https://github.com/marlonsouza/pipemagic",
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
