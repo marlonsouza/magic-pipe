@@ -6,3 +6,5 @@ uvicorn>=0.24.0
 anthropic>=0.7.0
 anthropic-tools>=0.1.0
 anthropic-bedrock>=0.1.0
+agents-python>=0.1.0
+mcp-core>=0.1.0

@@ -1,8 +1,19 @@
 import asyncio
 import os
+import sys
 from typing import Optional
-from agents import Agent, Runner, trace
-from agents.mcp import MCPServer
+
+try:
+    from agents import Agent, Runner, trace
+    from agents.mcp import MCPServer
+except ImportError:
+    print("""
+Error: Required MCP agent packages not found. 
+Please make sure you have the correct agent packages installed.
+You might need to install them from a specific source or contact the package maintainer.
+    """)
+    sys.exit(1)
+
 from .mcp_server import CodeReviewMCPServer
 from .github_integration import GitHubIntegration
 
