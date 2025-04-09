@@ -158,27 +158,24 @@ jobs:
               fi
             done
             
-            
-## Additional Information
-
-> 🔍 **Review Details**
-> - This review was automatically generated using AI analysis
-> - Each file was analyzed for:
->   - Code quality and best practices
->   - Potential bugs and security issues
->   - Documentation and maintainability
->   - Language-specific considerations
->
-> 💡 **Have Questions?**
-> - Need clarification? Ask in a comment below
-> - Want a specific focus? Mention it in your reply
-> - The bot will continue monitoring this PR for updates
-
----
-*Generated with ❤️ by the AI Code Review Bot*
-EOF
-
-          }
+            echo "## Additional Information"
+            echo ""
+            echo "> 🔍 **Review Details**"
+            echo "> - This review was automatically generated using AI analysis"
+            echo "> - Each file was analyzed for:"
+            echo ">   - Code quality and best practices"
+            echo ">   - Potential bugs and security issues"
+            echo ">   - Documentation and maintainability"
+            echo ">   - Language-specific considerations"
+            echo ""
+            echo "> 💡 **Have Questions?**"
+            echo "> - Need clarification? Ask in a comment below"
+            echo "> - Want a specific focus? Mention it in your reply"
+            echo "> - The bot will continue monitoring this PR for updates"
+            echo ""
+            echo "---"
+            echo "*Generated with ❤️ by the AI Code Review Bot*"
+          } > code_review_output.txt
 
       - name: Comment on PR
         if: always()  # Run even if previous step had issues
