@@ -103,7 +103,7 @@ jobs:
               # Send request with timeout
               if timeout 300s python -m src.mcp_server < "$request_file" > "$response_file" 2>/dev/null; then
                 # Verify response is valid JSON with a message
-                if jq -e '.messages[0].content' "$response" >/dev/null 2>&1; then
+                if jq -e '.messages[0].content' "$response_file" >/dev/null 2>&1; then
                   return 0
                 fi
               fi
