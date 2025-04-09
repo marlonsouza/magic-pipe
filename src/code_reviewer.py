@@ -1,6 +1,6 @@
 import os
 from typing import Optional
-from openai import AsyncOpenAI, AuthenticationError, NotFoundError, RateLimitError
+from openai import AsyncOpenAI, AuthenticationError, NotFoundError, RateLimitError, APIConnectionError
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -13,9 +13,9 @@ class CodeReviewer:
         self.client = AsyncOpenAI(api_key=api_key)
         self.model = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
         
-    async def review(self, file_content: str, diff: str) -> str:
+    async def review(self, file_content: str, diff: str, custom_prompt: Optional[str] = None) -> str:
         try:
-            prompt = self._build_review_prompt(file_content, diff)
+            prompt = custom_prompt if custom_prompt else self._build_review_prompt(file_content, diff)
             
             response = await self.client.chat.completions.create(
                 model=self.model,
@@ -24,7 +24,8 @@ class CodeReviewer:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
-                max_tokens=1000
+                max_tokens=2000,
+                timeout=120  # 2 minute timeout
             )
             
             return response.choices[0].message.content
@@ -34,6 +35,8 @@ class CodeReviewer:
             return f"⚠️ Error: The model '{self.model}' is not available. Please try using 'gpt-3.5-turbo' or check your OpenAI account access."
         except RateLimitError:
             return "⚠️ Error: OpenAI API quota exceeded. Please check your billing details at https://platform.openai.com/account/billing"
+        except APIConnectionError:
+            return "⚠️ Error: Could not connect to OpenAI API. Please check your internet connection and try again."
         except Exception as e:
             return f"⚠️ Error performing code review: {str(e)}"
         
@@ -52,11 +55,10 @@ Full file context:
 ```
 
 Please provide:
-1. A summary of the changes
-2. Potential issues or bugs
-3. Code style and best practices feedback
-4. Security considerations
-5. Suggestions for improvement
+1. A concise summary of the changes
+2. Potential issues, bugs, or security concerns
+3. Suggestions for improvement
+4. Best practices that should be applied
 """
         else:
             return f"""Please review the following code:
@@ -66,9 +68,8 @@ Please provide:
 ```
 
 Please provide:
-1. Code quality assessment
-2. Potential issues or bugs
-3. Code style and best practices feedback
-4. Security considerations
-5. Suggestions for improvement
+1. A concise code quality assessment
+2. Potential issues, bugs, or security concerns
+3. Suggestions for improvement
+4. Best practices that should be applied
 """
