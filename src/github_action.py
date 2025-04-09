@@ -2,24 +2,37 @@ import asyncio
 import os
 import sys
 from .review_manager import ReviewManager
+from .mcp_server import run_mcp_server
+from .code_reviewer import debug_log
 
 async def main():
     try:
-        # Initialize the review manager
-        manager = ReviewManager()
+        # Check if we're using MCP or traditional mode
+        use_mcp = os.getenv('USE_MCP', 'false').lower() == 'true'
         
-        # Get the repository path from GitHub Actions workspace
-        repo_path = os.getenv('GITHUB_WORKSPACE', '.')
-        print(f"Using repository path: {repo_path}", file=sys.stderr)
-        
-        # Process review and post comments
-        success = await manager.process_review(repo_path)
-        
-        if not success:
-            sys.exit(1)
+        if use_mcp:
+            debug_log("Starting in MCP server mode")
+            await run_mcp_server()
+        else:
+            debug_log("Starting in traditional GitHub action mode")
+            # Initialize the review manager
+            manager = ReviewManager()
+            
+            # Get the repository path from GitHub Actions workspace
+            repo_path = os.getenv('GITHUB_WORKSPACE', '.')
+            debug_log(f"Using repository path: {repo_path}")
+            
+            # Process review and post comments
+            success = await manager.process_review(repo_path)
+            
+            if not success:
+                debug_log("Review process failed")
+                sys.exit(1)
+            else:
+                debug_log("Review process completed successfully")
             
     except Exception as e:
-        print(f"⚠️ Error during code review: {str(e)}", file=sys.stderr)
+        debug_log(f"⚠️ Error during code review: {str(e)}")
         sys.exit(1)
 
 if __name__ == "__main__":

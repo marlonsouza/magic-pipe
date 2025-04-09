@@ -44,25 +44,49 @@ jobs:
           python -m pip install --upgrade pip
           pip install git+https://github.com/marlonsouza/pipemagic.git
 
-      - name: Run Code Review
+      - name: Run Standard Code Review
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'mcp-review') }}
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || 'gpt-4' }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          python -m src.github_action 2>&1 | tee code_review_output.txt
+          echo "Running standard code review..."
+          python -m src.github_action 2>&1 | tee review_output.txt
 
+      - name: Run MCP Code Review
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'mcp-review') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || 'gpt-4' }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          USE_MCP: 'true'
+        run: |
+          echo "Running MCP code review server..."
+          python -m src.github_action 2>&1 | tee review_output.txt
+          
       - name: Comment on PR
         uses: peter-evans/create-or-update-comment@v3
+        if: ${{ success() }}
         with:
           issue-number: ${{ github.event.pull_request.number }}
-          body-file: code_review_output.txt
+          body-file: review_output.txt
 ```
 
 3. Add your OpenAI API key to your repository secrets:
    - Go to your repository Settings > Secrets > Actions
    - Add a new secret named `OPENAI_API_KEY`
    - Paste your OpenAI API key as the value
+   
+4. Using MCP Server Mode (Optional):
+   - To use the MCP server mode, add the label `mcp-review` to your pull request
+   - The GitHub Action will automatically use the MCP server for review
 
 #### Option B: Local Installation
 
