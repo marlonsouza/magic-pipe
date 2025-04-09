@@ -28,13 +28,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Code Review with Agents
+      - name: Run Code Review
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || 'gpt-3.5-turbo' }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || 'gpt-4' }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_ORGANIZATION: ${{ secrets.OPENAI_ORGANIZATION }}
         run: python -m src.main

@@ -1,7 +1,7 @@
 import os
 import asyncio
 import sys
-from typing import Optional
+from typing import Optional, Dict, Any
 from openai import AsyncOpenAI, AuthenticationError, NotFoundError, RateLimitError, APIConnectionError
 from dotenv import load_dotenv
 
@@ -18,10 +18,37 @@ class CodeReviewer:
             debug_log("ERROR: OPENAI_API_KEY not found in environment")
             raise ValueError("OPENAI_API_KEY environment variable is not set")
         self.client = AsyncOpenAI(api_key=api_key)
-        self.model = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
+        self.model = os.getenv('OPENAI_MODEL', 'gpt-4')
         self.max_retries = 3
         self.retry_delay = 5  # seconds
         debug_log(f"Using model: {self.model}")
+        
+    async def analyze_file(self, file_info: Dict[str, Any]) -> str:
+        """Analyze a file's content and changes."""
+        try:
+            # Prepare function call arguments
+            args = {
+                "type": "completion",
+                "context": {
+                    "file_path": file_info['filename'],
+                    "status": file_info['status'],
+                    "changes": f"+{file_info['additions']} -{file_info['deletions']}",
+                    "diff": file_info.get('patch', '')
+                }
+            }
+            
+            # Let the agent handle the review through function calls
+            return args
+                
+        except Exception as e:
+            return f"⚠️ Error analyzing file: {str(e)}"
+        
+    def format_review(self, filename: str, review_content: str) -> Dict[str, str]:
+        """Format a review for a single file."""
+        return {
+            'filename': filename,
+            'review': review_content
+        }
         
     async def review(self, file_content: str, diff: str, custom_prompt: Optional[str] = None) -> str:
         retry_count = 0
@@ -62,7 +89,7 @@ Lembre-se: você está aqui para ser um mentor amigável, não um crítico sever
                 return "⚠️ Error: Invalid OpenAI API key. Please check your OPENAI_API_KEY environment variable."
             except NotFoundError as e:
                 debug_log(f"Model not found error: {str(e)}")
-                return f"⚠️ Error: The model '{self.model}' is not available. Please try using 'gpt-3.5-turbo' or check your OpenAI account access."
+                return f"⚠️ Error: The model '{self.model}' is not available. Please try using 'gpt-4' or check your OpenAI account access."
             except RateLimitError as e:
                 debug_log(f"Rate limit error: {str(e)}")
                 return "⚠️ Error: OpenAI API quota exceeded. Please check your billing details at https://platform.openai.com/account/billing"
