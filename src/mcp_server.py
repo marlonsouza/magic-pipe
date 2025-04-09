@@ -1,135 +1,133 @@
 import asyncio
-import sys
-from typing import Dict, Any, List, Optional
 import json
 import os
+from typing import Dict, Any, List, Optional
+from git import Repo
+from agents.mcp import MCPServer, MCPMessage, MCPRequest, MCPFunction
 from .code_reviewer import CodeReviewer
 
-class MCPMessage:
-    def __init__(self, role: str, content: str):
-        self.role = role
-        self.content = content
-
-    def to_dict(self):
-        return {"role": self.role, "content": self.content}
-
-class CodeReviewMCPServer:
+class CodeReviewMCPServer(MCPServer):
     def __init__(self):
+        super().__init__()
         self.code_reviewer = CodeReviewer()
-
-    def _create_review_prompt(self, file_content: str, diff: str, file_path: str = "") -> str:
-        file_type = os.path.splitext(file_path)[1] if file_path else "unknown"
+        self.repo = None
         
-        base_prompt = f"""Please review the following {'changes to the ' + file_path if file_path else 'code'}:
-
-File type: {file_type}
-
-"""
-        if diff:
-            base_prompt += f"""Changes:
-```
-{diff}
-```
-
-Full file context:
-```
-{file_content}
-```
-"""
-        else:
-            base_prompt += f"""Full content:
-```
-{file_content}
-```
-"""
-
-        base_prompt += """
-Please provide:
-1. A concise summary of the changes/code
-2. Potential issues, bugs, or security concerns
-3. Suggestions for improvement
-4. Best practices applicable to this code
-"""
-
-        return base_prompt
-
-    async def handle_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        try:
-            # Extract file content and diff from context
-            context = request.get('context', {})
-            file_content = context.get('file_content', '')
-            diff = context.get('diff', '')
-            file_path = context.get('file_path', '')
-            
-            # Create a review prompt specific to the file type
-            prompt = self._create_review_prompt(file_content, diff, file_path)
-            
-            # Get the code review
-            review_result = await self.code_reviewer.review(file_content, diff, prompt)
-            
-            # Create response message
-            message = MCPMessage(role="assistant", content=review_result)
-            
-            # Return completion response
-            return {
-                "messages": [message.to_dict()]
-            }
-            
-        except Exception as e:
-            # Handle errors properly
-            error_message = MCPMessage(
-                role="assistant",
-                content=f"⚠️ Error performing code review: {str(e)}"
+        # Register available functions
+        self.register_functions([
+            MCPFunction(
+                name="review_code",
+                description="Review code changes in a pull request or repository",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "file_path": {"type": "string", "description": "Path to the file to review"},
+                        "diff": {"type": "string", "description": "Git diff of the changes"},
+                        "content": {"type": "string", "description": "Current content of the file"}
+                    },
+                    "required": ["file_path", "content"]
+                }
+            ),
+            MCPFunction(
+                name="get_file_content",
+                description="Get the content of a file from the repository",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "file_path": {"type": "string", "description": "Path to the file"},
+                        "ref": {"type": "string", "description": "Git reference (commit, branch, etc)"}
+                    },
+                    "required": ["file_path"]
+                }
+            ),
+            MCPFunction(
+                name="get_file_diff",
+                description="Get the diff of a file between two commits",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "file_path": {"type": "string", "description": "Path to the file"},
+                        "base_ref": {"type": "string", "description": "Base commit reference"},
+                        "head_ref": {"type": "string", "description": "Head commit reference"}
+                    },
+                    "required": ["file_path", "base_ref", "head_ref"]
+                }
             )
-            return {"messages": [error_message.to_dict()]}
+        ])
 
-    async def _read_request(self) -> str:
-        request_str = ""
+    def initialize_repo(self, repo_path: str):
+        """Initialize git repository."""
+        self.repo = Repo(repo_path)
+
+    async def handle_completion(self, request: MCPRequest) -> Dict[str, Any]:
+        """Handle completion requests."""
+        try:
+            function_name = request.function_call.name
+            params = request.function_call.arguments
+
+            if function_name == "review_code":
+                review_result = await self.code_reviewer.review(
+                    file_content=params["content"],
+                    diff=params.get("diff", ""),
+                    custom_prompt=None
+                )
+                return MCPMessage(role="assistant", content=review_result).to_dict()
+            
+            elif function_name == "get_file_content":
+                if not self.repo:
+                    return MCPMessage(
+                        role="assistant",
+                        content="Error: Repository not initialized"
+                    ).to_dict()
+                    
+                ref = params.get("ref", "HEAD")
+                content = self.repo.git.show(f"{ref}:{params['file_path']}")
+                return MCPMessage(role="assistant", content=content).to_dict()
+            
+            elif function_name == "get_file_diff":
+                if not self.repo:
+                    return MCPMessage(
+                        role="assistant",
+                        content="Error: Repository not initialized"
+                    ).to_dict()
+                    
+                diff = self.repo.git.diff(
+                    params["base_ref"],
+                    params["head_ref"],
+                    "--",
+                    params["file_path"]
+                )
+                return MCPMessage(role="assistant", content=diff).to_dict()
+            
+            else:
+                return MCPMessage(
+                    role="assistant",
+                    content=f"Function {function_name} not implemented"
+                ).to_dict()
+
+        except Exception as e:
+            return MCPMessage(
+                role="assistant",
+                content=f"Error processing request: {str(e)}"
+            ).to_dict()
+
+    async def start(self):
+        """Start the MCP server."""
         while True:
             try:
-                line = await asyncio.get_event_loop().run_in_executor(None, sys.stdin.readline)
-                if not line:
-                    return ""
-                request_str += line
-                if line.strip() == "":
-                    return request_str.strip()
-            except Exception as e:
-                print(f"Error reading request: {str(e)}", file=sys.stderr)
-                return ""
-
-    async def _write_response(self, response: Dict[str, Any]):
-        try:
-            response_str = json.dumps(response)
-            print(response_str)
-            print("")  # Empty line to signal end of response
-            sys.stdout.flush()
-        except Exception as e:
-            print(f"Error writing response: {str(e)}", file=sys.stderr)
-
-    async def run(self):
-        """Run the MCP server"""
-        try:
-            while True:
-                request_str = await self._read_request()
-                if not request_str:
+                request = await self.read_request()
+                if not request:
                     continue
 
-                try:
-                    request = json.loads(request_str)
-                    if request.get('type') == 'completion':
-                        response = await self.handle_completion(request)
-                        await self._write_response(response)
-                    else:
-                        await self._write_response({"error": "Unsupported request type"})
-                except json.JSONDecodeError as e:
-                    await self._write_response({"error": f"Invalid JSON request: {str(e)}"})
-                except Exception as e:
-                    await self._write_response({"error": f"Error processing request: {str(e)}"})
+                response = await self.handle_completion(request)
+                await self.write_response(response)
 
-        except Exception as e:
-            print(f"Server error: {str(e)}", file=sys.stderr)
-            raise
+            except Exception as e:
+                error_response = MCPMessage(
+                    role="assistant",
+                    content=f"Server error: {str(e)}"
+                ).to_dict()
+                await self.write_response(error_response)
 
 if __name__ == "__main__":
     server = CodeReviewMCPServer()
-    asyncio.run(server.run())
+    asyncio.run(server.start())
