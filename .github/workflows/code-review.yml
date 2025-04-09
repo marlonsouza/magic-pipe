@@ -58,7 +58,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          OPENAI_MODEL: 'gpt-3.5-turbo'
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || 'gpt-3.5-turbo' }}
         run: |
           mkdir -p reviews
           total_files=$(echo '${{ steps.changed-files.outputs.files }}' | jq '. | length')

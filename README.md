@@ -114,10 +114,29 @@ if __name__ == "__main__":
 
 ### ⚙️ Configuration Options
 
+You can configure the tool using environment variables:
+
 - `OPENAI_API_KEY`: Your OpenAI API key (required)
 - `OPENAI_MODEL`: Model to use for reviews (default: gpt-3.5-turbo)
+  - Options: gpt-3.5-turbo, gpt-4, gpt-4-turbo-preview
+  - Can be set via GitHub Secrets for Actions or .env file for local use
 - `PR_BASE_SHA`: Base commit SHA for PR comparison (optional)
 - `PR_HEAD_SHA`: Head commit SHA for PR comparison (optional)
+
+### Environment Setup
+
+#### For GitHub Actions
+1. Go to your repository Settings > Secrets > Actions
+2. Add the required secrets:
+   - `OPENAI_API_KEY`: Your OpenAI API key
+   - `OPENAI_MODEL`: (Optional) The model to use, e.g., "gpt-4"
+
+#### For Local Development
+Create a `.env` file in your project root:
+```env
+OPENAI_API_KEY=your_api_key_here
+OPENAI_MODEL=gpt-3.5-turbo  # Optional, defaults to gpt-3.5-turbo
+```
 
 ## 🤝 Contributing
 
