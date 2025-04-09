@@ -30,36 +30,55 @@ class ReviewManager:
                 return response.status == 201
 
     def format_review_report(self, reviews: List[Dict[str, str]], total_files: int) -> str:
-        """Format the review results into a markdown report."""
+        """Format the review results into a concise markdown report."""
+        # Get detailed mode from environment variable (default to false)
+        detailed_reviews = os.getenv('DETAILED_REVIEWS', 'false').lower() == 'true'
+        
         report = [
-            "# 🎉 Code Review Mágico\n",
-            "## ✨ Visão Geral\n",
-            f"Olá! Eu analisei {total_files} arquivo(s) neste PR e tenho alguns feedbacks construtivos para compartilhar!\n",
-            "## 📝 Análise dos Arquivos\n"
+            "# 🎉 Code Review\n",
+            f"Analisei {total_files} arquivo(s) neste PR. Aqui está o resumo das principais observações:\n"
         ]
 
+        # Add summary of key findings
+        summary_points = []
+        
+        # Process each file and collect key points
         for review in reviews:
-            report.extend([
-                f"### 🔍 `{review['file_path']}`\n",
-                f"{review['review']}\n",
-                "---\n"
-            ])
-
+            file_name = review['file_path'].split('/')[-1]  # Get just the filename without path
+            
+            if detailed_reviews:
+                # Add full detailed review for each file
+                report.extend([
+                    f"## 🔍 `{file_name}`\n",
+                    f"{review['review']}\n",
+                    "---\n"
+                ])
+            else:
+                # Extract the first paragraph or sentence from each review as a summary
+                review_text = review['review']
+                first_para = review_text.split('\n\n')[0] if '\n\n' in review_text else review_text
+                
+                # If still too long, take just the first sentence
+                if len(first_para) > 200:
+                    first_sentence = first_para.split('. ')[0]
+                    summary_points.append(f"**`{file_name}`**: {first_sentence}.")
+                else:
+                    summary_points.append(f"**`{file_name}`**: {first_para}")
+        
+        # If using summary mode, add the points to the report
+        if not detailed_reviews:
+            report.append("## 📝 Resumo por Arquivo\n")
+            for point in summary_points:
+                report.append(f"- {point}\n")
+        
         report.extend([
-            "## ℹ️ Informações Adicionais\n",
-            "> 🤖 **Sobre esta Análise**\n",
-            "> - Esta revisão foi gerada automaticamente usando análise de IA\n",
-            "> - Cada arquivo foi analisado considerando:\n",
-            ">   - ✨ Qualidade e boas práticas de código\n",
-            ">   - 🛡️ Potenciais bugs e questões de segurança\n",
-            ">   - 📚 Documentação e manutenibilidade\n",
-            ">   - 🎯 Considerações específicas da linguagem\n\n",
-            "> 💡 **Dúvidas ou Sugestões?**\n",
-            "> - Precisa de esclarecimentos? Comente abaixo!\n",
-            "> - Quer um foco específico? Me avise na resposta\n",
-            "> - Continuarei monitorando este PR para atualizações\n\n",
-            "---\n",
-            "✨ *Gerado com ❤️ pelo seu assistente de código favorito* 🤖✨"
+            "## 💡 Principais Recomendações\n",
+            "- Mantenha a consistência dos padrões de código usados no projeto\n",
+            "- Considere adicionar testes para as novas funcionalidades\n",
+            "- Documente interfaces públicas e APIs\n",
+            "- Verifique tratamento de erros e casos extremos\n",
+            "\n---\n",
+            "✨ *Análise gerada automaticamente. Para revisão detalhada de um arquivo específico, mencione-o nos comentários.* ✨"
         ])
 
         return "\n".join(report)

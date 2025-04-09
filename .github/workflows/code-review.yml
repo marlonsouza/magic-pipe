@@ -39,6 +39,8 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           OPENAI_ORGANIZATION: ${{ secrets.OPENAI_ORGANIZATION }}
           USE_GITHUB_ACTION: 'true'
+          DEBUG_MODE: ${{ github.event.pull_request.labels.*.name contains 'debug' }}
+          DETAILED_REVIEWS: ${{ github.event.pull_request.labels.*.name contains 'detailed-review' }}
         run: |
           echo "Running standard code review..."
           python -m src.github_action 2>&1 | tee review_output.txt
@@ -54,6 +56,8 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           OPENAI_ORGANIZATION: ${{ secrets.OPENAI_ORGANIZATION }}
           USE_MCP: 'true'
+          DEBUG_MODE: ${{ github.event.pull_request.labels.*.name contains 'debug' }}
+          DETAILED_REVIEWS: ${{ github.event.pull_request.labels.*.name contains 'detailed-review' }}
         run: |
           echo "Running MCP code review server..."
           python -m src.github_action 2>&1 | tee review_output.txt

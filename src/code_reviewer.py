@@ -7,8 +7,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Debug mode controlled by environment variable, off by default
+DEBUG_MODE = os.getenv('DEBUG_MODE', 'false').lower() == 'true'
+
 def debug_log(message: str):
-    print(f"DEBUG: {message}", file=sys.stderr)
+    if DEBUG_MODE:
+        print(f"DEBUG: {message}", file=sys.stderr)
 
 class CodeReviewer:
     def __init__(self):
@@ -115,9 +119,49 @@ Lembre-se: você está aqui para ser um mentor amigável, não um crítico sever
         
     def _build_review_prompt(self, file_content: str, diff: str) -> str:
         debug_log("Building review prompt...")
-        if diff:
-            debug_log("Including diff in prompt")
-            return f"""Please review the following code changes:
+        concise_mode = not os.getenv('DETAILED_REVIEWS', 'false').lower() == 'true'
+        
+        if concise_mode:
+            debug_log("Using concise review prompt")
+            if diff:
+                return f"""Review the following code changes as an experienced senior developer. Focus on key issues only.
+
+Changes:
+```
+{diff}
+```
+
+File context:
+```
+{file_content}
+```
+
+Provide a VERY CONCISE review (1-2 paragraphs maximum) that a senior developer would give. Focus ONLY on:
+1. The most critical quality or security issues (if any)
+2. One key suggestion for improvement
+3. Highlight any good practices you see
+
+Be brief, direct, and to the point as if you were a busy tech lead. Avoid lengthy explanations.
+"""
+            else:
+                return f"""Review the following code as an experienced senior developer. Focus on key issues only.
+
+```
+{file_content}
+```
+
+Provide a VERY CONCISE review (1-2 paragraphs maximum) that a senior developer would give. Focus ONLY on:
+1. The most critical quality or security issues (if any)
+2. One key suggestion for improvement
+3. Highlight any good practices you see
+
+Be brief, direct, and to the point as if you were a busy tech lead. Avoid lengthy explanations.
+"""
+        else:
+            debug_log("Using detailed review prompt")
+            if diff:
+                debug_log("Including diff in prompt")
+                return f"""Please review the following code changes:
 
 Changes:
 ```
@@ -135,9 +179,9 @@ Please provide:
 3. Suggestions for improvement
 4. Best practices that should be applied
 """
-        else:
-            debug_log("No diff provided, reviewing full content")
-            return f"""Please review the following code:
+            else:
+                debug_log("No diff provided, reviewing full content")
+                return f"""Please review the following code:
 
 ```
 {file_content}
