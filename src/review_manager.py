@@ -30,42 +30,96 @@ class ReviewManager:
                 return response.status == 201
 
     def format_review_report(self, reviews: List[Dict[str, str]], total_files: int) -> str:
-        """Format the review results into a markdown report."""
+        """Format the review results into a concise markdown report."""
+        # Get detailed mode from environment variable (default to false)
+        detailed_reviews = os.getenv('DETAILED_REVIEWS', 'false').lower() == 'true'
+        
         report = [
-            "# 🎉 Code Review Mágico\n",
-            "## ✨ Visão Geral\n",
-            f"Olá! Eu analisei {total_files} arquivo(s) neste PR e tenho alguns feedbacks construtivos para compartilhar!\n",
-            "## 📝 Análise dos Arquivos\n"
+            "# 🎉 Revisão de Código\n",
+            f"Analisei {total_files} arquivo(s) neste PR. Aqui está o resumo das principais observações:\n"
         ]
 
+        # Add summary of key findings
+        summary_points = []
+        
+        # Process each file and collect key points
         for review in reviews:
+            file_name = review['file_path'].split('/')[-1]  # Get just the filename without path
+            
+            if detailed_reviews:
+                # Add full detailed review for each file
+                report.extend([
+                    f"## 🔍 `{file_name}`\n",
+                    f"{review['review']}\n",
+                    "---\n"
+                ])
+            else:
+                # Extract the first paragraph or sentence from each review as a summary
+                review_text = review['review']
+                first_para = review_text.split('\n\n')[0] if '\n\n' in review_text else review_text
+                
+                # If still too long, take just the first sentence
+                if len(first_para) > 200:
+                    first_sentence = first_para.split('. ')[0]
+                    summary_points.append(f"**`{file_name}`**: {first_sentence}.")
+                else:
+                    summary_points.append(f"**`{file_name}`**: {first_para}")
+        
+        # If using summary mode, add the points to the report
+        if not detailed_reviews:
+            report.append("## 📝 Resumo por Arquivo\n")
+            for point in summary_points:
+                report.append(f"- {point}\n")
+        
+        # Extract specific recommendations from reviews
+        key_recommendations = []
+        for review in reviews:
+            file_path = review['file_path']
+            review_text = review['review']
+            
+            # Split by lines to find recommendations
+            lines = review_text.split('\n')
+            for line in lines:
+                # Look for lines that mention line numbers and contain suggestions
+                if ('linha' in line.lower() or 'line' in line.lower() or 
+                    any(str(i) in line for i in range(1, 1000)) and  # Has numbers 1-999
+                    ('sugiro' in line.lower() or 'recomendo' in line.lower() or 
+                     'considere' in line.lower() or 'deveria' in line.lower() or
+                     'poderia' in line.lower() or 'melhor' in line.lower() or
+                     'issue' in line.lower() or 'problema' in line.lower() or
+                     'should' in line.lower() or 'could' in line.lower() or
+                     'consider' in line.lower() or 'recommend' in line.lower())):
+                    # Format: filename:recommendation
+                    file_name = file_path.split('/')[-1]  # Just the filename without path
+                    key_recommendations.append(f"**{file_name}**: {line.strip()}")
+        
+        report.append("## 💡 Principais Recomendações\n")
+        
+        if key_recommendations:
+            for rec in key_recommendations[:5]:  # Limit to top 5 recommendations
+                report.append(f"- {rec}\n")
+        else:
             report.extend([
-                f"### 🔍 `{review['file_path']}`\n",
-                f"{review['review']}\n",
-                "---\n"
+                "- Mantenha a consistência dos padrões de código no projeto\n",
+                "- Considere adicionar testes para novas funcionalidades\n",
+                "- Verifique tratamento de erros e casos extremos\n",
+                "- Documente interfaces públicas e APIs importantes\n"
             ])
-
+        
         report.extend([
-            "## ℹ️ Informações Adicionais\n",
-            "> 🤖 **Sobre esta Análise**\n",
-            "> - Esta revisão foi gerada automaticamente usando análise de IA\n",
-            "> - Cada arquivo foi analisado considerando:\n",
-            ">   - ✨ Qualidade e boas práticas de código\n",
-            ">   - 🛡️ Potenciais bugs e questões de segurança\n",
-            ">   - 📚 Documentação e manutenibilidade\n",
-            ">   - 🎯 Considerações específicas da linguagem\n\n",
-            "> 💡 **Dúvidas ou Sugestões?**\n",
-            "> - Precisa de esclarecimentos? Comente abaixo!\n",
-            "> - Quer um foco específico? Me avise na resposta\n",
-            "> - Continuarei monitorando este PR para atualizações\n\n",
-            "---\n",
-            "✨ *Gerado com ❤️ pelo seu assistente de código favorito* 🤖✨"
+            "\n---\n",
+            "✨ *Análise gerada automaticamente. Para revisão detalhada de um arquivo específico, mencione-o nos comentários.* ✨"
         ])
 
         return "\n".join(report)
 
-    async def process_review(self, repo_path: str) -> bool:
-        """Process the code review and post results."""
+    async def process_review(self, repo_path: str) -> dict:
+        """Process the code review and post results.
+        
+        Returns a dictionary with:
+            - success: Boolean indicating if the operation succeeded
+            - review_text: The formatted review text (if generated)
+        """
         try:
             # Initialize the repository
             self.reviewer.initialize_repo(repo_path)
@@ -73,18 +127,31 @@ class ReviewManager:
             # Get changed files
             changed_files = self.reviewer.get_changed_files()
             if not changed_files:
-                print("No files to review")
-                return True
+                return {
+                    "success": True,
+                    "review_text": "# 🎉 Revisão de Código\n\nNenhum arquivo para revisar neste PR."
+                }
 
             # Process changes
             reviews = await self.reviewer.process_changes(changed_files)
             
-            # Format and post review
+            # Format review
             report = self.format_review_report(reviews, len(changed_files))
-            success = await self.post_review_comment(report)
             
-            return success
+            # Post review (if GITHUB_TOKEN is set)
+            success = True
+            if self.github_token:
+                success = await self.post_review_comment(report)
+            
+            return {
+                "success": success,
+                "review_text": report
+            }
 
         except Exception as e:
-            print(f"Error during review process: {str(e)}")
-            return False
+            error_msg = f"Error during review process: {str(e)}"
+            print(error_msg)
+            return {
+                "success": False,
+                "review_text": f"# ⚠️ Erro na Revisão\n\nOcorreu um erro durante o processo de revisão: {error_msg}"
+            }

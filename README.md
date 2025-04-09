@@ -146,6 +146,17 @@ You can configure the tool using environment variables:
   - Can be set via GitHub Secrets for Actions or .env file for local use
 - `PR_BASE_SHA`: Base commit SHA for PR comparison (optional)
 - `PR_HEAD_SHA`: Head commit SHA for PR comparison (optional)
+- `DEBUG_MODE`: Enable detailed debug logs (default: false)
+- `DETAILED_REVIEWS`: Enable detailed file-by-file review instead of summarized review (default: false)
+- `USE_MCP`: Use MCP server mode instead of direct OpenAI API calls (default: false)
+
+### 🏷️ PR Labels for Configuration
+
+When using GitHub Actions, you can use PR labels to control how the review is performed:
+
+- `mcp-review`: Use MCP server mode instead of standard review
+- `debug`: Enable debug mode for detailed logs
+- `detailed-review`: Show full detailed reviews of each file instead of summaries
 
 ### Environment Setup
 

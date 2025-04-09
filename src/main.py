@@ -37,14 +37,16 @@ Diff:
             review_result = await reviewer.review(
                 file_content=file_content,
                 diff=file_info.get('patch', ''),
+                file_path=file_info['filename'],
                 custom_prompt=None
             )
             
-            # Store the review
-            reviews.append({
-                'filename': file_info['filename'],
-                'review': review_result
-            })
+            # Only store reviews with actual content
+            if review_result.strip():
+                reviews.append({
+                    'filename': file_info['filename'],
+                    'review': review_result
+                })
             
             debug_log(f"Completed review for {file_info['filename']}")
 

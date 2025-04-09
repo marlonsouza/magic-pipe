@@ -7,8 +7,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Debug mode controlled by environment variable, off by default
+DEBUG_MODE = os.getenv('DEBUG_MODE', 'false').lower() == 'true'
+
 def debug_log(message: str):
-    print(f"DEBUG: {message}", file=sys.stderr)
+    if DEBUG_MODE:
+        print(f"DEBUG: {message}", file=sys.stderr)
 
 class CodeReviewer:
     def __init__(self):
@@ -50,49 +54,58 @@ class CodeReviewer:
             'review': review_content
         }
         
-    async def review(self, file_content: str, diff: str, custom_prompt: Optional[str] = None) -> str:
+    async def review(self, file_content: str, diff: str, file_path: str = "", custom_prompt: Optional[str] = None) -> str:
         retry_count = 0
         last_error = None
         
         while retry_count < self.max_retries:
             try:
                 debug_log(f"Review attempt {retry_count + 1}/{self.max_retries}")
-                prompt = custom_prompt if custom_prompt else self._build_review_prompt(file_content, diff)
+                prompt = custom_prompt if custom_prompt else self._build_review_prompt(file_content, diff, file_path)
                 
                 debug_log("Sending request to OpenAI API...")
                 response = await self.client.chat.completions.create(
                     model=self.model,
                     messages=[
-                        {"role": "system", "content": """Você é um assistente amigável e especialista em revisão de código. 
-Sua missão é ajudar os desenvolvedores a melhorarem seu código de forma construtiva e encorajadora.
+                        {"role": "system", "content": """Você é um assistente especialista em revisão de código, agindo como um tech lead sênior.
 
 Ao revisar o código:
-- Use um tom positivo e amigável
-- Comece destacando os pontos fortes
-- Faça sugestões de forma construtiva
-- Use emojis para tornar o feedback mais acessível
-- Mantenha o foco em ajudar o desenvolvedor a crescer
+- Seja direto e objetivo
+- Foque nos problemas mais críticos e em melhorias importantes
+- Inclua números de linha específicos ao mencionar problemas ou sugestões
+- Mantenha o feedback conciso e acionável
+- Use sempre a língua portuguesa para seus comentários
 
-Lembre-se: você está aqui para ser um mentor amigável, não um crítico severo! 🤝"""},
-                        {"role": "user", "content": prompt}
+Seu objetivo é fornecer feedback técnico objetivo como um engenheiro sênior, não ser um crítico ou elogiar sem necessidade."""},
+                        {"role": "user", "content": prompt + "\n\nIMPORTANTE: Responda SEMPRE em português."}
                     ],
-                    temperature=0.7,
+                    temperature=0.5,  # Lower temperature for more consistent output
                     max_tokens=2000,
                     timeout=120  # 2 minute timeout
                 )
                 
                 debug_log("Successfully received response from OpenAI")
-                return response.choices[0].message.content
+                content = response.choices[0].message.content
+                
+                # If the response is about no issues found (in English or Portuguese), return an empty string
+                if (content.strip() == "No issues found." or 
+                    content.strip() == "No issues found" or
+                    content.strip() == "Nenhum problema encontrado." or
+                    content.strip() == "Nenhum problema encontrado" or
+                    content.strip() == "Sem problemas encontrados"):
+                    return ""
+                
+                return content
                 
             except AuthenticationError as e:
                 debug_log(f"Authentication error: {str(e)}")
-                return "⚠️ Error: Invalid OpenAI API key. Please check your OPENAI_API_KEY environment variable."
+                return "⚠️ Erro: Chave de API OpenAI inválida. Por favor, verifique sua variável de ambiente OPENAI_API_KEY."
             except NotFoundError as e:
                 debug_log(f"Model not found error: {str(e)}")
-                return f"⚠️ Error: The model '{self.model}' is not available. Please try using 'gpt-4' or check your OpenAI account access."
+                return f"⚠️ Erro: O modelo '{self.model}' não está disponível. Por favor, tente usar 'gpt-4' ou verifique seu acesso à conta OpenAI."
             except RateLimitError as e:
                 debug_log(f"Rate limit error: {str(e)}")
-                return "⚠️ Error: OpenAI API quota exceeded. Please check your billing details at https://platform.openai.com/account/billing"
+                return "⚠️ Erro: Cota da API OpenAI excedida. Por favor, verifique seus detalhes de faturamento em https://platform.openai.com/account/billing"
             except APIConnectionError as e:
                 debug_log(f"Connection error: {str(e)}")
                 last_error = e
@@ -111,41 +124,103 @@ Lembre-se: você está aqui para ser um mentor amigável, não um crítico sever
                 continue
                 
         debug_log(f"All retry attempts failed. Last error: {str(last_error)}")
-        return f"⚠️ Error performing code review after {self.max_retries} attempts: {str(last_error)}"
+        return f"⚠️ Erro ao realizar revisão de código após {self.max_retries} tentativas: {str(last_error)}"
         
-    def _build_review_prompt(self, file_content: str, diff: str) -> str:
+    def _build_review_prompt(self, file_content: str, diff: str, file_path: str) -> str:
         debug_log("Building review prompt...")
-        if diff:
-            debug_log("Including diff in prompt")
-            return f"""Please review the following code changes:
+        concise_mode = not os.getenv('DETAILED_REVIEWS', 'false').lower() == 'true'
+        
+        if concise_mode:
+            debug_log("Using concise review prompt")
+            if diff:
+                return f"""Revise as seguintes alterações de código como um desenvolvedor sênior experiente. Foque apenas nos problemas principais.
 
-Changes:
+Arquivo: {file_path}
+
+Alterações:
 ```
 {diff}
 ```
 
-Full file context:
+Contexto do arquivo:
 ```
 {file_content}
 ```
 
-Please provide:
-1. A concise summary of the changes
-2. Potential issues, bugs, or security concerns
-3. Suggestions for improvement
-4. Best practices that should be applied
+Forneça uma revisão MUITO CONCISA (máximo de 1-2 parágrafos) que um desenvolvedor sênior faria.
+Quando encontrar um problema ou tiver uma recomendação, inclua o(s) número(s) específico(s) da(s) linha(s) a que se aplica.
+
+Foque APENAS em:
+1. Os problemas mais críticos de qualidade ou segurança (se houver)
+2. Uma sugestão principal de melhoria
+3. Destaque quaisquer boas práticas que você veja
+
+Se nenhum problema for encontrado e não houver recomendações específicas, responda apenas com "Nenhum problema encontrado."
+
+Seja breve, direto e objetivo como se você fosse um tech lead ocupado. Evite explicações longas.
+"""
+            else:
+                return f"""Revise o seguinte código como um desenvolvedor sênior experiente. Foque apenas nos problemas principais.
+
+Arquivo: {file_path}
+
+```
+{file_content}
+```
+
+Forneça uma revisão MUITO CONCISA (máximo de 1-2 parágrafos) que um desenvolvedor sênior faria.
+Quando encontrar um problema ou tiver uma recomendação, inclua o(s) número(s) específico(s) da(s) linha(s) a que se aplica.
+
+Foque APENAS em:
+1. Os problemas mais críticos de qualidade ou segurança (se houver)
+2. Uma sugestão principal de melhoria
+3. Destaque quaisquer boas práticas que você veja
+
+Se nenhum problema for encontrado e não houver recomendações específicas, responda apenas com "Nenhum problema encontrado."
+
+Seja breve, direto e objetivo como se você fosse um tech lead ocupado. Evite explicações longas.
 """
         else:
-            debug_log("No diff provided, reviewing full content")
-            return f"""Please review the following code:
+            debug_log("Using detailed review prompt")
+            if diff:
+                debug_log("Including diff in prompt")
+                return f"""Por favor, revise as seguintes alterações de código:
+
+Arquivo: {file_path}
+
+Alterações:
+```
+{diff}
+```
+
+Contexto completo do arquivo:
+```
+{file_content}
+```
+
+Por favor, forneça:
+1. Um resumo conciso das alterações
+2. Potenciais problemas, bugs ou preocupações de segurança (com números de linha)
+3. Sugestões de melhoria (com números de linha específicos onde aplicável)
+4. Boas práticas que deveriam ser aplicadas
+
+Se não houver problemas encontrados, responda com "Nenhum problema encontrado."
+"""
+            else:
+                debug_log("No diff provided, reviewing full content")
+                return f"""Por favor, revise o seguinte código:
+
+Arquivo: {file_path}
 
 ```
 {file_content}
 ```
 
-Please provide:
-1. A concise code quality assessment
-2. Potential issues, bugs, or security concerns
-3. Suggestions for improvement
-4. Best practices that should be applied
+Por favor, forneça:
+1. Uma avaliação concisa da qualidade do código
+2. Potenciais problemas, bugs ou preocupações de segurança (com números de linha)
+3. Sugestões de melhoria (com números de linha específicos onde aplicável)
+4. Boas práticas que deveriam ser aplicadas
+
+Se não houver problemas encontrados, responda com "Nenhum problema encontrado."
 """

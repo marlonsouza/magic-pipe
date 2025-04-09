@@ -39,9 +39,18 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           OPENAI_ORGANIZATION: ${{ secrets.OPENAI_ORGANIZATION }}
           USE_GITHUB_ACTION: 'true'
+          DEBUG_MODE: ${{ contains(github.event.pull_request.labels.*.name, 'debug') }}
+          DETAILED_REVIEWS: ${{ contains(github.event.pull_request.labels.*.name, 'detailed-review') }}
         run: |
           echo "Running standard code review..."
-          python -m src.github_action 2>&1 | tee review_output.txt
+          # Ensure we create a default review in case the program fails
+          echo "# 🎉 Code Review" > review_output.txt
+          echo "Analisando mudanças no PR..." >> review_output.txt
+          python -m src.github_action > review_result.txt 2>&1 || echo "⚠️ O processo de revisão encontrou erros. Veja os logs para mais detalhes." >> review_output.txt
+          # Check if the review was generated properly and use it
+          if [ -s review_result.txt ]; then
+            cat review_result.txt > review_output.txt
+          fi
 
       - name: Run MCP Code Review
         if: ${{ contains(github.event.pull_request.labels.*.name, 'mcp-review') }}
@@ -54,13 +63,22 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           OPENAI_ORGANIZATION: ${{ secrets.OPENAI_ORGANIZATION }}
           USE_MCP: 'true'
+          DEBUG_MODE: ${{ contains(github.event.pull_request.labels.*.name, 'debug') }}
+          DETAILED_REVIEWS: ${{ contains(github.event.pull_request.labels.*.name, 'detailed-review') }}
         run: |
           echo "Running MCP code review server..."
-          python -m src.github_action 2>&1 | tee review_output.txt
+          # Ensure we create a default review in case the program fails
+          echo "# 🎉 Code Review (MCP Mode)" > review_output.txt
+          echo "Analisando mudanças no PR usando MCP server..." >> review_output.txt
+          python -m src.github_action > review_result.txt 2>&1 || echo "⚠️ O processo de revisão MCP encontrou erros. Veja os logs para mais detalhes." >> review_output.txt
+          # Check if the review was generated properly and use it
+          if [ -s review_result.txt ]; then
+            cat review_result.txt > review_output.txt
+          fi
           
       - name: Comment on PR
         uses: peter-evans/create-or-update-comment@v3
-        if: ${{ success() }}
+        if: ${{ always() }}
         with:
           issue-number: ${{ github.event.pull_request.number }}
           body-file: review_output.txt
