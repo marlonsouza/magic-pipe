@@ -2,8 +2,12 @@ import asyncio
 import os
 import sys
 from .review_manager import ReviewManager
-from .mcp_server import run_mcp_server
 from .code_reviewer import debug_log
+
+# Import MCP server only when needed to avoid dependency issues
+async def run_mcp_server_wrapper():
+    from .mcp_server import run_mcp_server
+    await run_mcp_server()
 
 async def main():
     try:
@@ -12,7 +16,7 @@ async def main():
         
         if use_mcp:
             debug_log("Starting in MCP server mode")
-            await run_mcp_server()
+            await run_mcp_server_wrapper()
         else:
             debug_log("Starting in traditional GitHub action mode")
             # Initialize the review manager

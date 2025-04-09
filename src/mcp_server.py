@@ -4,8 +4,66 @@ import os
 import sys
 from typing import Dict, Any, List, Optional
 from git import Repo
-from openai_agents import MCPServer, MCPMessage, MCPRequest, MCPFunction
 from .code_reviewer import CodeReviewer, debug_log
+
+# Define the MCP protocol classes since openai_agents dependency may not be available
+class MCPFunction:
+    def __init__(self, name, description, parameters):
+        self.name = name
+        self.description = description
+        self.parameters = parameters
+
+class MCPFunctionCall:
+    def __init__(self, name, arguments):
+        self.name = name
+        self.arguments = arguments
+
+class MCPRequest:
+    def __init__(self, function_call):
+        self.function_call = function_call
+
+class MCPMessage:
+    def __init__(self, role, content):
+        self.role = role
+        self.content = content
+        
+    def to_dict(self):
+        return {
+            "role": self.role,
+            "content": self.content
+        }
+
+class MCPServer:
+    def __init__(self):
+        self.functions = []
+        
+    def register_functions(self, functions):
+        self.functions = functions
+        
+    async def read_request(self):
+        try:
+            # Read from stdin
+            line = await asyncio.get_event_loop().run_in_executor(None, sys.stdin.readline)
+            if not line:
+                return None
+                
+            data = json.loads(line)
+            function_call = MCPFunctionCall(
+                name=data["function_call"]["name"],
+                arguments=data["function_call"]["arguments"]
+            )
+            return MCPRequest(function_call=function_call)
+        except Exception as e:
+            debug_log(f"Error reading request: {str(e)}")
+            return None
+            
+    async def write_response(self, response):
+        try:
+            # Write to stdout
+            print(json.dumps(response), flush=True)
+        except Exception as e:
+            debug_log(f"Error writing response: {str(e)}")
+            sys.stderr.write(f"Error writing response: {str(e)}\n")
 
 class CodeReviewMCPServer(MCPServer):
     def __init__(self):
