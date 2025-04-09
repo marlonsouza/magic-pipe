@@ -54,39 +54,43 @@ class CodeReviewer:
             'review': review_content
         }
         
-    async def review(self, file_content: str, diff: str, custom_prompt: Optional[str] = None) -> str:
+    async def review(self, file_content: str, diff: str, file_path: str = "", custom_prompt: Optional[str] = None) -> str:
         retry_count = 0
         last_error = None
         
         while retry_count < self.max_retries:
             try:
                 debug_log(f"Review attempt {retry_count + 1}/{self.max_retries}")
-                prompt = custom_prompt if custom_prompt else self._build_review_prompt(file_content, diff)
+                prompt = custom_prompt if custom_prompt else self._build_review_prompt(file_content, diff, file_path)
                 
                 debug_log("Sending request to OpenAI API...")
                 response = await self.client.chat.completions.create(
                     model=self.model,
                     messages=[
-                        {"role": "system", "content": """Você é um assistente amigável e especialista em revisão de código. 
-Sua missão é ajudar os desenvolvedores a melhorarem seu código de forma construtiva e encorajadora.
+                        {"role": "system", "content": """Você é um assistente especialista em revisão de código, agindo como um tech lead sênior.
 
 Ao revisar o código:
-- Use um tom positivo e amigável
-- Comece destacando os pontos fortes
-- Faça sugestões de forma construtiva
-- Use emojis para tornar o feedback mais acessível
-- Mantenha o foco em ajudar o desenvolvedor a crescer
+- Seja direto e objetivo
+- Foque nos problemas mais críticos e em melhorias importantes
+- Inclua números de linha específicos ao mencionar problemas ou sugestões
+- Mantenha o feedback conciso e acionável
 
-Lembre-se: você está aqui para ser um mentor amigável, não um crítico severo! 🤝"""},
+Seu objetivo é fornecer feedback técnico objetivo como um engenheiro sênior, não ser um crítico ou elogiar sem necessidade."""},
                         {"role": "user", "content": prompt}
                     ],
-                    temperature=0.7,
+                    temperature=0.5,  # Lower temperature for more consistent output
                     max_tokens=2000,
                     timeout=120  # 2 minute timeout
                 )
                 
                 debug_log("Successfully received response from OpenAI")
-                return response.choices[0].message.content
+                content = response.choices[0].message.content
+                
+                # If the response is "No issues found", return an empty string so it's filtered out
+                if content.strip() == "No issues found." or content.strip() == "No issues found":
+                    return ""
+                
+                return content
                 
             except AuthenticationError as e:
                 debug_log(f"Authentication error: {str(e)}")
@@ -117,7 +121,7 @@ Lembre-se: você está aqui para ser um mentor amigável, não um crítico sever
         debug_log(f"All retry attempts failed. Last error: {str(last_error)}")
         return f"⚠️ Error performing code review after {self.max_retries} attempts: {str(last_error)}"
         
-    def _build_review_prompt(self, file_content: str, diff: str) -> str:
+    def _build_review_prompt(self, file_content: str, diff: str, file_path: str) -> str:
         debug_log("Building review prompt...")
         concise_mode = not os.getenv('DETAILED_REVIEWS', 'false').lower() == 'true'
         
@@ -125,6 +129,8 @@ Lembre-se: você está aqui para ser um mentor amigável, não um crítico sever
             debug_log("Using concise review prompt")
             if diff:
                 return f"""Review the following code changes as an experienced senior developer. Focus on key issues only.
+
+File: {file_path}
 
 Changes:
 ```
@@ -136,24 +142,36 @@ File context:
 {file_content}
 ```
 
-Provide a VERY CONCISE review (1-2 paragraphs maximum) that a senior developer would give. Focus ONLY on:
+Provide a VERY CONCISE review (1-2 paragraphs maximum) that a senior developer would give.
+When you find an issue or have a recommendation, include the specific line number(s) it applies to.
+
+Focus ONLY on:
 1. The most critical quality or security issues (if any)
 2. One key suggestion for improvement
 3. Highlight any good practices you see
+
+If no issues are found and there are no specific recommendations, just reply with "No issues found."
 
 Be brief, direct, and to the point as if you were a busy tech lead. Avoid lengthy explanations.
 """
             else:
                 return f"""Review the following code as an experienced senior developer. Focus on key issues only.
 
+File: {file_path}
+
 ```
 {file_content}
 ```
 
-Provide a VERY CONCISE review (1-2 paragraphs maximum) that a senior developer would give. Focus ONLY on:
+Provide a VERY CONCISE review (1-2 paragraphs maximum) that a senior developer would give.
+When you find an issue or have a recommendation, include the specific line number(s) it applies to.
+
+Focus ONLY on:
 1. The most critical quality or security issues (if any)
 2. One key suggestion for improvement
 3. Highlight any good practices you see
+
+If no issues are found and there are no specific recommendations, just reply with "No issues found."
 
 Be brief, direct, and to the point as if you were a busy tech lead. Avoid lengthy explanations.
 """
@@ -162,6 +180,8 @@ Be brief, direct, and to the point as if you were a busy tech lead. Avoid length
             if diff:
                 debug_log("Including diff in prompt")
                 return f"""Please review the following code changes:
+
+File: {file_path}
 
 Changes:
 ```
@@ -175,13 +195,17 @@ Full file context:
 
 Please provide:
 1. A concise summary of the changes
-2. Potential issues, bugs, or security concerns
-3. Suggestions for improvement
+2. Potential issues, bugs, or security concerns (with line numbers)
+3. Suggestions for improvement (with specific line numbers where applicable)
 4. Best practices that should be applied
+
+If there are no issues found, respond with "No issues found."
 """
             else:
                 debug_log("No diff provided, reviewing full content")
                 return f"""Please review the following code:
+
+File: {file_path}
 
 ```
 {file_content}
@@ -189,7 +213,9 @@ Please provide:
 
 Please provide:
 1. A concise code quality assessment
-2. Potential issues, bugs, or security concerns
-3. Suggestions for improvement
+2. Potential issues, bugs, or security concerns (with line numbers)
+3. Suggestions for improvement (with specific line numbers where applicable)
 4. Best practices that should be applied
+
+If there are no issues found, respond with "No issues found."
 """

@@ -27,12 +27,15 @@ async def main():
             debug_log(f"Using repository path: {repo_path}")
             
             # Process review and post comments
-            success = await manager.process_review(repo_path)
+            result = await manager.process_review(repo_path)
             
-            if not success:
+            if not result["success"]:
                 debug_log("Review process failed")
+                print("⚠️ Falha no processo de revisão")
                 sys.exit(1)
             else:
+                # Print review to stdout for GitHub Action to capture
+                print(result["review_text"])
                 debug_log("Review process completed successfully")
             
     except Exception as e:

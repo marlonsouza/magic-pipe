@@ -68,12 +68,14 @@ class LLMReviewer:
 
                 # Generate review
                 debug_log(f"Generating review for {file_path}")
-                review = await self.code_reviewer.review(head_content, diff)
+                review = await self.code_reviewer.review(head_content, diff, file_path)
                 
-                reviews.append({
-                    "file_path": file_path,
-                    "review": review
-                })
+                # Only add the review if there's actual content
+                if review.strip():
+                    reviews.append({
+                        "file_path": file_path,
+                        "review": review
+                    })
                 debug_log(f"Completed review for {file_path}")
 
             except Exception as e:

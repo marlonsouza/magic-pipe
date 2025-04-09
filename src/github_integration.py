@@ -101,12 +101,45 @@ class GitHubIntegration:
             for point in summary_points:
                 sections.append(f"- {point}\n")
         
+        # Extract specific recommendations from reviews
+        key_recommendations = []
+        for review in reviews:
+            file_path = review['filename']
+            review_text = review['review']
+            
+            # Skip empty reviews
+            if not review_text.strip():
+                continue
+                
+            # Split by lines to find recommendations
+            lines = review_text.split('\n')
+            for line in lines:
+                # Look for lines that mention line numbers and contain suggestions
+                if ('linha' in line.lower() or 'line' in line.lower() or 
+                    any(str(i) in line for i in range(1, 1000)) and  # Has numbers 1-999
+                    ('sugiro' in line.lower() or 'recomendo' in line.lower() or 
+                     'considere' in line.lower() or 'deveria' in line.lower() or
+                     'poderia' in line.lower() or 'melhor' in line.lower() or
+                     'issue' in line.lower() or 'problema' in line.lower() or
+                     'should' in line.lower() or 'could' in line.lower() or
+                     'consider' in line.lower() or 'recommend' in line.lower())):
+                    # Format: filename:recommendation
+                    file_name = file_path.split('/')[-1]  # Just the filename without path
+                    key_recommendations.append(f"**{file_name}**: {line.strip()}")
+        
+        sections.append("## 💡 Principais Recomendações\n")
+        
+        if key_recommendations:
+            for rec in key_recommendations[:5]:  # Limit to top 5 recommendations
+                sections.append(f"- {rec}\n")
+        else:
+            sections.extend([
+                "- Mantenha a consistência nos padrões de código\n",
+                "- Adicione testes para novas funcionalidades\n",
+                "- Verifique tratamento de erros e casos extremos\n"
+            ])
+        
         sections.extend([
-            "## 💡 Principais Recomendações\n",
-            "- Mantenha a consistência nos padrões de código\n",
-            "- Adicione testes para novas funcionalidades\n",
-            "- Documente interfaces públicas e APIs\n",
-            "- Verifique tratamento de erros e casos extremos\n",
             "\n---\n",
             "✨ *Análise gerada automaticamente. Para revisão detalhada de um arquivo específico, mencione-o nos comentários.* ✨"
         ])
