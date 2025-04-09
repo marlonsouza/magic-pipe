@@ -74,9 +74,10 @@ Ao revisar o código:
 - Foque nos problemas mais críticos e em melhorias importantes
 - Inclua números de linha específicos ao mencionar problemas ou sugestões
 - Mantenha o feedback conciso e acionável
+- Use sempre a língua portuguesa para seus comentários
 
 Seu objetivo é fornecer feedback técnico objetivo como um engenheiro sênior, não ser um crítico ou elogiar sem necessidade."""},
-                        {"role": "user", "content": prompt}
+                        {"role": "user", "content": prompt + "\n\nIMPORTANTE: Responda SEMPRE em português."}
                     ],
                     temperature=0.5,  # Lower temperature for more consistent output
                     max_tokens=2000,
@@ -86,21 +87,25 @@ Seu objetivo é fornecer feedback técnico objetivo como um engenheiro sênior, 
                 debug_log("Successfully received response from OpenAI")
                 content = response.choices[0].message.content
                 
-                # If the response is "No issues found", return an empty string so it's filtered out
-                if content.strip() == "No issues found." or content.strip() == "No issues found":
+                # If the response is about no issues found (in English or Portuguese), return an empty string
+                if (content.strip() == "No issues found." or 
+                    content.strip() == "No issues found" or
+                    content.strip() == "Nenhum problema encontrado." or
+                    content.strip() == "Nenhum problema encontrado" or
+                    content.strip() == "Sem problemas encontrados"):
                     return ""
                 
                 return content
                 
             except AuthenticationError as e:
                 debug_log(f"Authentication error: {str(e)}")
-                return "⚠️ Error: Invalid OpenAI API key. Please check your OPENAI_API_KEY environment variable."
+                return "⚠️ Erro: Chave de API OpenAI inválida. Por favor, verifique sua variável de ambiente OPENAI_API_KEY."
             except NotFoundError as e:
                 debug_log(f"Model not found error: {str(e)}")
-                return f"⚠️ Error: The model '{self.model}' is not available. Please try using 'gpt-4' or check your OpenAI account access."
+                return f"⚠️ Erro: O modelo '{self.model}' não está disponível. Por favor, tente usar 'gpt-4' ou verifique seu acesso à conta OpenAI."
             except RateLimitError as e:
                 debug_log(f"Rate limit error: {str(e)}")
-                return "⚠️ Error: OpenAI API quota exceeded. Please check your billing details at https://platform.openai.com/account/billing"
+                return "⚠️ Erro: Cota da API OpenAI excedida. Por favor, verifique seus detalhes de faturamento em https://platform.openai.com/account/billing"
             except APIConnectionError as e:
                 debug_log(f"Connection error: {str(e)}")
                 last_error = e
@@ -119,7 +124,7 @@ Seu objetivo é fornecer feedback técnico objetivo como um engenheiro sênior, 
                 continue
                 
         debug_log(f"All retry attempts failed. Last error: {str(last_error)}")
-        return f"⚠️ Error performing code review after {self.max_retries} attempts: {str(last_error)}"
+        return f"⚠️ Erro ao realizar revisão de código após {self.max_retries} tentativas: {str(last_error)}"
         
     def _build_review_prompt(self, file_content: str, diff: str, file_path: str) -> str:
         debug_log("Building review prompt...")
@@ -128,94 +133,94 @@ Seu objetivo é fornecer feedback técnico objetivo como um engenheiro sênior, 
         if concise_mode:
             debug_log("Using concise review prompt")
             if diff:
-                return f"""Review the following code changes as an experienced senior developer. Focus on key issues only.
+                return f"""Revise as seguintes alterações de código como um desenvolvedor sênior experiente. Foque apenas nos problemas principais.
 
-File: {file_path}
+Arquivo: {file_path}
 
-Changes:
+Alterações:
 ```
 {diff}
 ```
 
-File context:
+Contexto do arquivo:
 ```
 {file_content}
 ```
 
-Provide a VERY CONCISE review (1-2 paragraphs maximum) that a senior developer would give.
-When you find an issue or have a recommendation, include the specific line number(s) it applies to.
+Forneça uma revisão MUITO CONCISA (máximo de 1-2 parágrafos) que um desenvolvedor sênior faria.
+Quando encontrar um problema ou tiver uma recomendação, inclua o(s) número(s) específico(s) da(s) linha(s) a que se aplica.
 
-Focus ONLY on:
-1. The most critical quality or security issues (if any)
-2. One key suggestion for improvement
-3. Highlight any good practices you see
+Foque APENAS em:
+1. Os problemas mais críticos de qualidade ou segurança (se houver)
+2. Uma sugestão principal de melhoria
+3. Destaque quaisquer boas práticas que você veja
 
-If no issues are found and there are no specific recommendations, just reply with "No issues found."
+Se nenhum problema for encontrado e não houver recomendações específicas, responda apenas com "Nenhum problema encontrado."
 
-Be brief, direct, and to the point as if you were a busy tech lead. Avoid lengthy explanations.
+Seja breve, direto e objetivo como se você fosse um tech lead ocupado. Evite explicações longas.
 """
             else:
-                return f"""Review the following code as an experienced senior developer. Focus on key issues only.
+                return f"""Revise o seguinte código como um desenvolvedor sênior experiente. Foque apenas nos problemas principais.
 
-File: {file_path}
+Arquivo: {file_path}
 
 ```
 {file_content}
 ```
 
-Provide a VERY CONCISE review (1-2 paragraphs maximum) that a senior developer would give.
-When you find an issue or have a recommendation, include the specific line number(s) it applies to.
+Forneça uma revisão MUITO CONCISA (máximo de 1-2 parágrafos) que um desenvolvedor sênior faria.
+Quando encontrar um problema ou tiver uma recomendação, inclua o(s) número(s) específico(s) da(s) linha(s) a que se aplica.
 
-Focus ONLY on:
-1. The most critical quality or security issues (if any)
-2. One key suggestion for improvement
-3. Highlight any good practices you see
+Foque APENAS em:
+1. Os problemas mais críticos de qualidade ou segurança (se houver)
+2. Uma sugestão principal de melhoria
+3. Destaque quaisquer boas práticas que você veja
 
-If no issues are found and there are no specific recommendations, just reply with "No issues found."
+Se nenhum problema for encontrado e não houver recomendações específicas, responda apenas com "Nenhum problema encontrado."
 
-Be brief, direct, and to the point as if you were a busy tech lead. Avoid lengthy explanations.
+Seja breve, direto e objetivo como se você fosse um tech lead ocupado. Evite explicações longas.
 """
         else:
             debug_log("Using detailed review prompt")
             if diff:
                 debug_log("Including diff in prompt")
-                return f"""Please review the following code changes:
+                return f"""Por favor, revise as seguintes alterações de código:
 
-File: {file_path}
+Arquivo: {file_path}
 
-Changes:
+Alterações:
 ```
 {diff}
 ```
 
-Full file context:
+Contexto completo do arquivo:
 ```
 {file_content}
 ```
 
-Please provide:
-1. A concise summary of the changes
-2. Potential issues, bugs, or security concerns (with line numbers)
-3. Suggestions for improvement (with specific line numbers where applicable)
-4. Best practices that should be applied
+Por favor, forneça:
+1. Um resumo conciso das alterações
+2. Potenciais problemas, bugs ou preocupações de segurança (com números de linha)
+3. Sugestões de melhoria (com números de linha específicos onde aplicável)
+4. Boas práticas que deveriam ser aplicadas
 
-If there are no issues found, respond with "No issues found."
+Se não houver problemas encontrados, responda com "Nenhum problema encontrado."
 """
             else:
                 debug_log("No diff provided, reviewing full content")
-                return f"""Please review the following code:
+                return f"""Por favor, revise o seguinte código:
 
-File: {file_path}
+Arquivo: {file_path}
 
 ```
 {file_content}
 ```
 
-Please provide:
-1. A concise code quality assessment
-2. Potential issues, bugs, or security concerns (with line numbers)
-3. Suggestions for improvement (with specific line numbers where applicable)
-4. Best practices that should be applied
+Por favor, forneça:
+1. Uma avaliação concisa da qualidade do código
+2. Potenciais problemas, bugs ou preocupações de segurança (com números de linha)
+3. Sugestões de melhoria (com números de linha específicos onde aplicável)
+4. Boas práticas que deveriam ser aplicadas
 
-If there are no issues found, respond with "No issues found."
+Se não houver problemas encontrados, responda com "Nenhum problema encontrado."
 """

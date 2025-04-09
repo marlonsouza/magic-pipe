@@ -35,7 +35,7 @@ class ReviewManager:
         detailed_reviews = os.getenv('DETAILED_REVIEWS', 'false').lower() == 'true'
         
         report = [
-            "# 🎉 Code Review\n",
+            "# 🎉 Revisão de Código\n",
             f"Analisei {total_files} arquivo(s) neste PR. Aqui está o resumo das principais observações:\n"
         ]
 
@@ -102,7 +102,8 @@ class ReviewManager:
             report.extend([
                 "- Mantenha a consistência dos padrões de código no projeto\n",
                 "- Considere adicionar testes para novas funcionalidades\n",
-                "- Verifique tratamento de erros e casos extremos\n"
+                "- Verifique tratamento de erros e casos extremos\n",
+                "- Documente interfaces públicas e APIs importantes\n"
             ])
         
         report.extend([
@@ -128,7 +129,7 @@ class ReviewManager:
             if not changed_files:
                 return {
                     "success": True,
-                    "review_text": "# 🎉 Code Review\n\nNenhum arquivo para revisar neste PR."
+                    "review_text": "# 🎉 Revisão de Código\n\nNenhum arquivo para revisar neste PR."
                 }
 
             # Process changes
@@ -152,5 +153,5 @@ class ReviewManager:
             print(error_msg)
             return {
                 "success": False,
-                "review_text": f"# ⚠️ Erro na Revisão\n\n{error_msg}"
+                "review_text": f"# ⚠️ Erro na Revisão\n\nOcorreu um erro durante o processo de revisão: {error_msg}"
             }

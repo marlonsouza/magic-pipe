@@ -65,7 +65,7 @@ class GitHubIntegration:
         detailed_reviews = os.getenv('DETAILED_REVIEWS', 'false').lower() == 'true'
         
         sections = [
-            "# 🎉 Code Review\n",
+            "# 🎉 Revisão de Código\n",
             f"Analisei {len(reviews)} arquivo(s) neste PR. Aqui está o resumo das principais observações:\n"
         ]
 
@@ -136,7 +136,8 @@ class GitHubIntegration:
             sections.extend([
                 "- Mantenha a consistência nos padrões de código\n",
                 "- Adicione testes para novas funcionalidades\n",
-                "- Verifique tratamento de erros e casos extremos\n"
+                "- Verifique tratamento de erros e casos extremos\n",
+                "- Documente interfaces públicas e APIs importantes\n"
             ])
         
         sections.extend([
